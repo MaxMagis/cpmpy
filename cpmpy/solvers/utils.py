@@ -35,6 +35,8 @@ from .pindakaas import CPM_pindakaas
 from .highs import CPM_highs
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .minicp_native import CPM_minicp_native
+from .maxicp_native import CPM_maxicp_native
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -94,6 +96,8 @@ class SolverLookup():
                 ("hexaly", CPM_hexaly),
                 ("rc2", CPM_rc2),
                 ("scip", CPM_scip),
+                ("minicp_native", CPM_minicp_native),
+                ("maxicp_native", CPM_maxicp_native),
                ]
 
     @classmethod
