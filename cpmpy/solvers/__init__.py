@@ -82,6 +82,8 @@ from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
 from .scip import CPM_scip
 from .highs import CPM_highs
+from .minicp_native import CPM_minicp_native
+from .maxicp_native import CPM_maxicp_native
 
 __all__ = [
     "CPM_choco",
@@ -101,6 +103,8 @@ __all__ = [
     "CPM_rc2",
     "CPM_scip",
     "CPM_z3",
+    "CPM_minicp_native",
+    "CPM_maxicp_native",
     "SolverLookup",
     "param_combinations",
 ]
