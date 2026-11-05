@@ -400,6 +400,12 @@ class TestSolvers:
         # modulo
         assert  cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc")
 
+        # nested arguments of div, mod and pow
+        y = cp.intvar(0, 5, shape=2)
+        assert  cp.Model([ y[0] // (y[1] + 1) == 2, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) % (y[1] + 1) == 0, y == [5, 1] ]).solve(solver="minizinc")
+        assert  cp.Model([ (y[0] + 1) ** 2 == 36, y == [5, 1] ]).solve(solver="minizinc")
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -839,7 +845,7 @@ class TestSupportedSolvers:
         assert m.solve(solver=solver, time_limit=1)
 
         try:
-            m.solve(solver=solver, time_limit=-1)
+            cp.SolverLookup.get(solver, m).solve(time_limit=-1)
             assert False
         except ValueError:
             pass
@@ -1153,11 +1159,48 @@ class TestSupportedSolvers:
         # normally, should not be able to solve within 1s...
         assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
+        s = cp.SolverLookup.get(solver, m)
+        s.solve(time_limit=1)
+        # normally, should not be able to solve within 1s, ensure status is set by solver interface here
+        assert s.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+
         # now trivally unsat
         m += cp.sum(bv) <= 0
         m.solve(solver=solver)
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
+
+    def test_status_runtime(self, solver):
+        
+        n = 500
+        seed = 42
+        np.random.seed(seed)
+
+        bv = cp.boolvar(shape=n)
+        model = cp.Model()
+        for _ in range(round(4.26 * n)):
+            lits = [x if np.random.random() < 0.5 else ~x for x in np.random.choice(bv, size=3)]
+            model += cp.any(lits)
+
+        model.solve(solver=solver, time_limit=3) # enough to not time-out the transformations
+        assert model.status().runtime is not None
+        assert model.status().runtime > 0
+
+        assert model.status().solve_time is not None
+        assert model.status().solve_time > 0
+        
+        assert model.status().runtime > model.status().solve_time # model overrides runttime with wallclock time
+
+        # test via solver interface
+        s = cp.SolverLookup.get(solver, model)
+        s.solve(time_limit=1)
+        assert s.status().runtime is not None
+        assert s.status().runtime > 0
+
+        assert s.status().solve_time is not None
+        assert s.status().solve_time > 0
+        
+        assert s.status().runtime == s.status().solve_time # solver interfce patches runtime to solve time for backwards compatibility
 
 
 
@@ -1297,6 +1340,9 @@ class TestSupportedSolvers:
 @pytest.mark.generate_constraints.with_args(numexprs)
 @pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
+
+    if constraint.name.startswith("reservoir") and solver == "z3":
+        pytest.skip("Decomposition of reservoir triggers upstream z3 bug: https://github.com/Z3Prover/z3/issues/11024")
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     lb, ub = constraint.get_bounds()
